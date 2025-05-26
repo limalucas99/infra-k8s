@@ -1,5 +1,15 @@
 provider "kubernetes" {
-  config_path = "~/.kube/config"
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+}
+
+data "aws_eks_cluster" "cluster" {
+  name = module.eks.cluster_name
+}
+
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.eks.cluster_name
 }
 
 resource "kubernetes_namespace" "api" {
@@ -36,7 +46,7 @@ resource "kubernetes_deployment" "api" {
       spec {
         container {
           name  = "api"
-          image = "seuuser/sua-api:latest" # Altere aqui com sua imagem Docker
+          image = "seuuser/sua-api:latest"
 
           port {
             container_port = 8000
