@@ -27,9 +27,9 @@ jobs:
 
       - name: Debug AWS credentials (safe)
         run: |
-          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
-          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
-          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
+          echo "AWS_ACCESS_KEY_ID TESTE length: ${#AWS_ACCESS_KEY_ID}"
+          echo "AWS_SECRET_ACCESS_KEY 23 length: ${#AWS_SECRET_ACCESS_KEY}"
+          echo "AWS_SESSION_TOKEN 45 length: ${#AWS_SESSION_TOKEN}"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
