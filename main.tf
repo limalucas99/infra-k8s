@@ -32,7 +32,7 @@ module "eks" {
       max_capacity     = 3
       min_capacity     = 1
 
-      instance_types = ["t3.medium"]
+      instance_types = ["t2.micro"]
 
       iam_role_name = "eks-managed-role-api" # <- Evita conflito com voclabs
     }
