@@ -1,5 +1,5 @@
 provider "aws" {
-  region = var.region
+  region = "us-east-1"
 }
 
 module "vpc" {
@@ -33,6 +33,8 @@ module "eks" {
       min_capacity     = 1
 
       instance_types = ["t3.medium"]
+
+      iam_role_name = "eks-managed-role-api" # <- Evita conflito com voclabs
     }
   }
 }
