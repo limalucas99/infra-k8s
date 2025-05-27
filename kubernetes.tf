@@ -1,23 +1,28 @@
+# Obtém os dados do cluster EKS criado diretamente com aws_eks_cluster
+data "aws_eks_cluster" "cluster" {
+  name = aws_eks_cluster.eks.name
+}
+
+# Obtém o token de autenticação do EKS
+data "aws_eks_cluster_auth" "cluster" {
+  name = aws_eks_cluster.eks.name
+}
+
+# Provedor Kubernetes configurado com dados do cluster direto
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  host                   = data.aws_eks_cluster.cluster.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority[0].data)
   token                  = data.aws_eks_cluster_auth.cluster.token
 }
 
-data "aws_eks_cluster" "cluster" {
-  name = module.eks.cluster_name
-}
-
-data "aws_eks_cluster_auth" "cluster" {
-  name = module.eks.cluster_name
-}
-
+# Namespace para a aplicação
 resource "kubernetes_namespace" "api" {
   metadata {
     name = "api"
   }
 }
 
+# Deployment da aplicação
 resource "kubernetes_deployment" "api" {
   metadata {
     name      = "api-deployment"
@@ -46,7 +51,7 @@ resource "kubernetes_deployment" "api" {
       spec {
         container {
           name  = "api"
-          image = "seuuser/sua-api:latest"
+          image = "seuuser/sua-api:latest" # <- Altere para sua imagem real
 
           port {
             container_port = 8000
@@ -57,6 +62,7 @@ resource "kubernetes_deployment" "api" {
   }
 }
 
+# Service para expor a aplicação via LoadBalancer
 resource "kubernetes_service" "api" {
   metadata {
     name      = "api-service"
