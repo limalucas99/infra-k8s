@@ -34,7 +34,7 @@ module "eks" {
 
       instance_types = ["t2.micro"]
 
-      iam_role_name = "labrole" # <- Evita conflito com voclabs
+      iam_role_name = "LabRole" # <- Evita conflito com voclabs
     }
   }
 }
