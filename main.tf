@@ -1,13 +1,30 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region = "us-east-1"
 }
 
-# Role manual do Academy (já existente, como a labRole)
+############################
+# 1. IAM Roles (já existentes no Academy)
+############################
 data "aws_iam_role" "eks_cluster_role" {
-  name = "labRole" # Troque se for outro nome da sua role
+  name = "labRole"
 }
 
-# VPC simplificada (ou use a que já existe)
+data "aws_iam_role" "eks_node_role" {
+  name = "labRole"
+}
+
+############################
+# 2. Rede simples (ou use módulos prontos)
+############################
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
 }
@@ -24,14 +41,41 @@ resource "aws_subnet" "subnet_b" {
   availability_zone = "us-east-1b"
 }
 
-# Security Group para o cluster
 resource "aws_security_group" "eks_cluster_sg" {
   name        = "eks-cluster-sg"
   description = "EKS cluster SG"
   vpc_id      = aws_vpc.main.id
 }
 
-# EKS Cluster
+############################
+# 3. Clean-up automático (se existir cluster antigo)
+############################
+resource "null_resource" "eks_cleanup" {
+  # força execução a cada 'terraform apply'
+  triggers = {
+    always_run = timestamp()
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<'EOT'
+# Se o cluster existir, deleta e espera terminar
+if aws eks describe-cluster --name academy-cluster >/dev/null 2>&1; then
+  echo "Cluster antigo encontrado. Excluindo..."
+  aws eks delete-cluster --name academy-cluster
+  echo "Aguardando remoção completa..."
+  aws eks wait cluster_deleted --name academy-cluster
+  echo "Cluster removido com sucesso."
+else
+  echo "Nenhum cluster com o nome 'academy-cluster' foi encontrado."
+fi
+EOT
+  }
+}
+
+############################
+# 4. Novo cluster EKS
+############################
 resource "aws_eks_cluster" "eks" {
   name     = "academy-cluster"
   role_arn = data.aws_iam_role.eks_cluster_role.arn
@@ -41,17 +85,16 @@ resource "aws_eks_cluster" "eks" {
     security_group_ids = [aws_security_group.eks_cluster_sg.id]
   }
 
-  version = "1.29"
-
-  depends_on = [aws_security_group.eks_cluster_sg]
+  version    = "1.29"
+  depends_on = [
+    null_resource.eks_cleanup,     # garante exclusão do cluster antigo
+    aws_security_group.eks_cluster_sg
+  ]
 }
 
-# IAM Role para o Node Group (pode ser a mesma do labRole ou outra criada manualmente)
-data "aws_iam_role" "eks_node_role" {
-  name = "labRole" # Reutilize a mesma se necessário
-}
-
-# Node Group gerenciado
+############################
+# 5. Node Group
+############################
 resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.eks.name
   node_group_name = "academy-node-group"
@@ -65,4 +108,15 @@ resource "aws_eks_node_group" "node_group" {
   }
 
   instance_types = ["t2.micro"]
+
+  depends_on = [
+    aws_eks_cluster.eks
+  ]
+}
+
+############################
+# 6. (opcional) Outputs
+############################
+output "cluster_endpoint" {
+  value = aws_eks_cluster.eks.endpoint
 }
