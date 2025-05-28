@@ -1,5 +1,5 @@
 #########################################################
-# 0.  Terraform & Provider
+# 0. Terraform & Provider
 #########################################################
 terraform {
   required_providers {
@@ -15,7 +15,7 @@ provider "aws" {
 }
 
 #########################################################
-# 1.  IAM Roles (pré-existentes no AWS Academy)
+# 1. IAM Roles (pré-existentes no AWS Academy)
 #########################################################
 data "aws_iam_role" "eks_cluster_role" {
   name = "labRole"
@@ -26,7 +26,7 @@ data "aws_iam_role" "eks_node_role" {
 }
 
 #########################################################
-# 2.  Rede mínima
+# 2. Rede mínima
 #########################################################
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
@@ -51,7 +51,7 @@ resource "aws_security_group" "eks_cluster_sg" {
 }
 
 #########################################################
-# 3.  Clean-up: remove cluster antigo se existir
+# 3. Clean-up: remove cluster antigo se existir
 #########################################################
 resource "null_resource" "eks_cleanup" {
   triggers = {
@@ -60,16 +60,14 @@ resource "null_resource" "eks_cleanup" {
 
   provisioner "local-exec" {
     # usa /usr/bin/env para portabilidade
-    interpreter = ["/usr/bin/env", "bash", "-c"]
+    interpreter = ["/usr/bin/env", "bash", "-e", "-c"]
 
     command = <<-EOT
-      set -euo pipefail
-
-      if aws eks describe-cluster --name academy-cluster >/dev/null 2>&1; then
+      if aws eks describe-cluster --name academy-cluster --region us-east-1 >/dev/null 2>&1; then
         echo "Cluster antigo encontrado. Excluindo..."
-        aws eks delete-cluster --name academy-cluster
+        aws eks delete-cluster --name academy-cluster --region us-east-1
         echo "Aguardando remoção completa..."
-        aws eks wait cluster_deleted --name academy-cluster
+        aws eks wait cluster_deleted --name academy-cluster --region us-east-1
         echo "Cluster removido com sucesso."
       else
         echo "Nenhum cluster com o nome 'academy-cluster' foi encontrado."
@@ -79,7 +77,7 @@ resource "null_resource" "eks_cleanup" {
 }
 
 #########################################################
-# 4.  Novo cluster EKS
+# 4. Novo cluster EKS
 #########################################################
 resource "aws_eks_cluster" "eks" {
   name     = "academy-cluster"
@@ -98,7 +96,7 @@ resource "aws_eks_cluster" "eks" {
 }
 
 #########################################################
-# 5.  Node Group
+# 5. Node Group
 #########################################################
 resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.eks.name
@@ -118,7 +116,7 @@ resource "aws_eks_node_group" "node_group" {
 }
 
 #########################################################
-# 6.  Outputs (únicos)
+# 6. Outputs
 #########################################################
 output "cluster_name" {
   value = aws_eks_cluster.eks.name
