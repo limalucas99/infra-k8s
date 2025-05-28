@@ -2,7 +2,7 @@ name: Terraform Apply (Kubernetes Infra)
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   terraform:
@@ -10,61 +10,67 @@ jobs:
     environment: production
 
     steps:
-      # 1) Checkout
+      #################################################################
+      # 1) Checkout repositório
+      #################################################################
       - uses: actions/checkout@v4
 
-      # 2) Credenciais AWS
+      #################################################################
+      # 2) Configura credenciais AWS
+      #################################################################
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region:            ${{ secrets.AWS_REGION }}
+          aws-region:            us-east-1
 
+      #################################################################
       # 3) Instala Terraform
+      #################################################################
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.0
 
-      # 4) Init
+      #################################################################
+      # 4) Terraform init
+      #################################################################
       - name: Terraform Init
         run: terraform init -input=false
 
-      # 5) Plan – salva como artefato
+      #################################################################
+      # 5) Importa cluster existente (caso ainda não esteja no state)
+      #################################################################
+      - name: Ensure cluster imported in state
+        id: import
+        run: |
+          if terraform state list | grep -q '^aws_eks_cluster\.eks$'; then
+            echo "Cluster já presente no state – pulando import."
+          else
+            echo "Importando academy-cluster para o state..."
+            terraform import -no-color aws_eks_cluster.eks academy-cluster
+          fi
+
+      #################################################################
+      # 6) Terraform Plan (salvo como artefato)
+      #################################################################
       - name: Terraform Plan
         id: plan
-        run: |
-          terraform plan -out=tfplan -input=false
+        run: terraform plan -input=false -out=tfplan
       - uses: actions/upload-artifact@v4
         with:
           name: tfplan
           path: tfplan
 
-      # 6) Apply – continua para passo de rollback se falhar
+      #################################################################
+      # 7) Terraform Apply
+      #################################################################
       - name: Terraform Apply
-        id: apply
-        run: |
-          set -eo pipefail
-          terraform apply -input=false -auto-approve tfplan
-        continue-on-error: true
+        run: terraform apply -input=false -auto-approve tfplan
 
-      # 7) Se apply falhar apenas no Node Group, taint + retry
-      - name: Retry – recreating only Node Group
-        if: steps.apply.outcome == 'failure'
-        run: |
-          echo "::warning title=Apply failed::Retrying only the node group"
-          terraform taint -allow-missing aws_eks_node_group.node_group
-          terraform apply -auto-approve
-        continue-on-error: true
-        # se falhar de novo, cai no próximo passo
-
-      # 8) Destroy total (rollback) se ainda falhou
-      - name: Rollback – Terraform Destroy
-        if: failure()        # qualquer falha anterior chega aqui
-        run: terraform destroy -auto-approve
-
-      - name: Ensure cluster in state
-        run: |
-          terraform state list | grep -q 'aws_eks_cluster.eks' || \
-          terraform import -no-color aws_eks_cluster.eks academy-cluster
+      #################################################################
+      # 8) (Opcional) Gera kubeconfig para passos posteriores
+      #################################################################
+      - name: Generate kubeconfig
+        run: aws eks update-kubeconfig --name academy-cluster --region us-east-1
