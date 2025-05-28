@@ -15,7 +15,7 @@ provider "aws" {
 }
 
 #########################################################
-# 1.  IAM Roles (já existentes no AWS Academy)
+# 1.  IAM Roles (pré-existentes no AWS Academy)
 #########################################################
 data "aws_iam_role" "eks_cluster_role" {
   name = "labRole"
@@ -26,7 +26,7 @@ data "aws_iam_role" "eks_node_role" {
 }
 
 #########################################################
-# 2.  Rede mínima (ou troque por módulo VPC pronto)
+# 2.  Rede mínima
 #########################################################
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
@@ -51,19 +51,19 @@ resource "aws_security_group" "eks_cluster_sg" {
 }
 
 #########################################################
-# 3.  Clean-up: remove cluster antigo, se existir
+# 3.  Clean-up: remove cluster antigo se existir
 #########################################################
 resource "null_resource" "eks_cleanup" {
   triggers = {
-    always_run = timestamp()   # força execução a cada apply
+    always_run = timestamp()
   }
 
   provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-c"]
+    # usa /usr/bin/env para portabilidade
+    interpreter = ["/usr/bin/env", "bash", "-c"]
 
     command = <<-EOT
-      #!/usr/bin/env bash
-      set -e
+      set -euo pipefail
 
       if aws eks describe-cluster --name academy-cluster >/dev/null 2>&1; then
         echo "Cluster antigo encontrado. Excluindo..."
@@ -118,7 +118,7 @@ resource "aws_eks_node_group" "node_group" {
 }
 
 #########################################################
-# 6.  Outputs (sem duplicação)
+# 6.  Outputs (únicos)
 #########################################################
 output "cluster_name" {
   value = aws_eks_cluster.eks.name
