@@ -5,44 +5,61 @@ on:
     branches: [main]
 
 jobs:
-  terraform-apply:
-    name: Terraform Apply
+  terraform:
     runs-on: ubuntu-latest
-
-    environment:
-      name: production
-      url: https://console.aws.amazon.com/
+    environment: production
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # 1) Checkout
+      - uses: actions/checkout@v4
 
-      - name: Debug AWS credentials (safe output)
-        run: |
-          echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
-          echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
-          echo "AWS_SESSION_TOKEN length: ${#AWS_SESSION_TOKEN}"
-        shell: bash
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-
+      # 2) Credenciais AWS
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      # 3) Instala Terraform
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.0
 
+      # 4) Init
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
 
+      # 5) Plan – salva como artefato
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -out=tfplan -input=false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
+
+      # 6) Apply – continua para passo de rollback se falhar
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        id: apply
+        run: |
+          set -eo pipefail
+          terraform apply -input=false -auto-approve tfplan
+        continue-on-error: true
+
+      # 7) Se apply falhar apenas no Node Group, taint + retry
+      - name: Retry – recreating only Node Group
+        if: steps.apply.outcome == 'failure'
+        run: |
+          echo "::warning title=Apply failed::Retrying only the node group"
+          terraform taint -allow-missing aws_eks_node_group.node_group
+          terraform apply -auto-approve
+        continue-on-error: true
+        # se falhar de novo, cai no próximo passo
+
+      # 8) Destroy total (rollback) se ainda falhou
+      - name: Rollback – Terraform Destroy
+        if: failure()        # qualquer falha anterior chega aqui
+        run: terraform destroy -auto-approve
