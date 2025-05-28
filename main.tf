@@ -1,5 +1,5 @@
 #########################################################
-# 0. Terraform & Provider
+# 0. Terraform & provider
 #########################################################
 terraform {
   required_providers {
@@ -51,52 +51,21 @@ resource "aws_security_group" "eks_cluster_sg" {
 }
 
 #########################################################
-# 3. Clean-up: remove cluster antigo se existir
-#########################################################
-resource "null_resource" "eks_cleanup" {
-  triggers = {
-    always_run = timestamp()
-  }
-
-  provisioner "local-exec" {
-    # usa /usr/bin/env para portabilidade
-    interpreter = ["/usr/bin/env", "bash", "-e", "-c"]
-
-    command = <<-EOT
-      if aws eks describe-cluster --name academy-cluster --region us-east-1 >/dev/null 2>&1; then
-        echo "Cluster antigo encontrado. Excluindo..."
-        aws eks delete-cluster --name academy-cluster --region us-east-1
-        echo "Aguardando remoção completa..."
-        aws eks wait cluster_deleted --name academy-cluster --region us-east-1
-        echo "Cluster removido com sucesso."
-      else
-        echo "Nenhum cluster com o nome 'academy-cluster' foi encontrado."
-      fi
-    EOT
-  }
-}
-
-#########################################################
-# 4. Novo cluster EKS
+# 3. Cluster EKS
 #########################################################
 resource "aws_eks_cluster" "eks" {
   name     = "academy-cluster"
+  version  = "1.29"
   role_arn = data.aws_iam_role.eks_cluster_role.arn
 
   vpc_config {
     subnet_ids         = [aws_subnet.subnet_a.id, aws_subnet.subnet_b.id]
     security_group_ids = [aws_security_group.eks_cluster_sg.id]
   }
-
-  version    = "1.29"
-  depends_on = [
-    null_resource.eks_cleanup,
-    aws_security_group.eks_cluster_sg
-  ]
 }
 
 #########################################################
-# 5. Node Group
+# 4. Node Group gerenciado
 #########################################################
 resource "aws_eks_node_group" "node_group" {
   cluster_name    = aws_eks_cluster.eks.name
@@ -116,7 +85,7 @@ resource "aws_eks_node_group" "node_group" {
 }
 
 #########################################################
-# 6. Outputs
+# 5. Outputs
 #########################################################
 output "cluster_name" {
   value = aws_eks_cluster.eks.name
