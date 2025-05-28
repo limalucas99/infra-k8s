@@ -51,10 +51,10 @@ resource "kubernetes_deployment" "api" {
       spec {
         container {
           name  = "api"
-          image = "seuuser/sua-api:latest" # <- Altere para sua imagem real
+          image = "nginxdemos/hello"  # imagem de teste leve
 
           port {
-            container_port = 8000
+            container_port = 80
           }
         }
       }
