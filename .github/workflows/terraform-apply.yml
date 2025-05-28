@@ -63,3 +63,8 @@ jobs:
       - name: Rollback – Terraform Destroy
         if: failure()        # qualquer falha anterior chega aqui
         run: terraform destroy -auto-approve
+
+      - name: Ensure cluster in state
+        run: |
+          terraform state list | grep -q 'aws_eks_cluster.eks' || \
+          terraform import -no-color aws_eks_cluster.eks academy-cluster
