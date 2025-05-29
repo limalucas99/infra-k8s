@@ -21,27 +21,33 @@ jobs:
           aws-region:            us-east-1
 
       - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.0
+        with: { terraform_version: 1.6.0 }
 
       - name: Terraform Init
         run: terraform init -input=false
 
-      # Importa recursos existentes, se necessários
-      - name: Import cluster / nodegroup / secret if missing
+      # Importa cluster / nodegroup se já existirem
+      - name: Import cluster & nodegroup if missing
         run: |
           terraform state list | grep -q '^aws_eks_cluster\.eks$' || \
-            terraform import aws_eks_cluster.eks academy-cluster
+            terraform import aws_eks_cluster.eks academy-cluster || true
           terraform state list | grep -q '^aws_eks_node_group\.node_group$' || \
             terraform import aws_eks_node_group.node_group academy-cluster:academy-node-group || true
-          terraform state list | grep -q '^aws_secretsmanager_secret\.eks_info$' || \
-            terraform import aws_secretsmanager_secret.eks_info $(aws secretsmanager list-secrets --region us-east-1 --query "SecretList[?Name=='eks-academy-cluster-info'].[ARN]" --output text) || true
 
       - name: Terraform Plan
         run: terraform plan -input=false -out=tfplan
 
       - name: Terraform Apply
+        id: apply
         run: terraform apply -input=false -auto-approve tfplan
+        continue-on-error: true     # permite passo seguinte se falhar
 
+      # Rollback: destrói tudo se o apply falhar
+      - name: Terraform Destroy (rollback)
+        if: steps.apply.outcome == 'failure'
+        run: terraform destroy -auto-approve
+
+      # (opcional) kubeconfig para próximos passos
       - name: Generate kubeconfig
+        if: steps.apply.outcome == 'success'
         run: aws eks update-kubeconfig --name academy-cluster --region us-east-1
