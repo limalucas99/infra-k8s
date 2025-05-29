@@ -1,15 +1,14 @@
 ########################################
-# 1. Secrets Manager – segredo “único”
+# Segredo único (usa name_prefix)
 ########################################
 resource "aws_secretsmanager_secret" "eks_info" {
-  name = "eks-${aws_eks_cluster.eks.name}-info"   #  ex.: eks-academy-cluster-info
-  description = "EKS connection data for ${aws_eks_cluster.eks.name}"
+  name_prefix  = "eks-${aws_eks_cluster.eks.name}-info-"
+  description  = "EKS connection data for ${aws_eks_cluster.eks.name}"
+  lifecycle { prevent_destroy = true } # não apaga em destroy
 }
 
 resource "aws_secretsmanager_secret_version" "eks_info" {
   secret_id = aws_secretsmanager_secret.eks_info.id
-
-  # grava tudo como JSON
   secret_string = jsonencode({
     cluster_name                     = aws_eks_cluster.eks.name
     cluster_endpoint                 = aws_eks_cluster.eks.endpoint
