@@ -17,16 +17,11 @@ provider "aws" {
 #########################################################
 # 1. IAM Roles (pré-existentes no AWS Academy)
 #########################################################
-data "aws_iam_role" "eks_cluster_role" {
-  name = "labRole"
-}
-
-data "aws_iam_role" "eks_node_role" {
-  name = "labRole"
-}
+data "aws_iam_role" "eks_cluster_role" { name = "labRole" }
+data "aws_iam_role" "eks_node_role"    { name = "labRole" }
 
 #########################################################
-# 2. VPC pública simples
+# 2. VPC pública simples (2 AZs)
 #########################################################
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
@@ -83,7 +78,7 @@ resource "aws_security_group" "eks_cluster_sg" {
 }
 
 #########################################################
-# 3. Cluster EKS
+# 3. Cluster EKS  (ignorando alterações internas)
 #########################################################
 resource "aws_eks_cluster" "eks" {
   name     = "academy-cluster"
@@ -93,6 +88,13 @@ resource "aws_eks_cluster" "eks" {
   vpc_config {
     subnet_ids         = [aws_subnet.subnet_a.id, aws_subnet.subnet_b.id]
     security_group_ids = [aws_security_group.eks_cluster_sg.id]
+  }
+
+  # ——— Impede que mudanças internas forcem recriação do cluster ———
+  lifecycle {
+    ignore_changes = [
+      bootstrap_self_managed_addons
+    ]
   }
 }
 
