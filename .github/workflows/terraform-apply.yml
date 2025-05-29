@@ -10,67 +10,38 @@ jobs:
     environment: production
 
     steps:
-      #################################################################
-      # 1) Checkout repositório
-      #################################################################
       - uses: actions/checkout@v4
 
-      #################################################################
-      # 2) Configura credenciais AWS
-      #################################################################
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      # AWS credentials
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region:            us-east-1
 
-      #################################################################
-      # 3) Instala Terraform
-      #################################################################
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.0
 
-      #################################################################
-      # 4) Terraform init
-      #################################################################
       - name: Terraform Init
         run: terraform init -input=false
 
-      #################################################################
-      # 5) Importa cluster existente (caso ainda não esteja no state)
-      #################################################################
-      - name: Ensure cluster imported in state
-        id: import
+      # Importa recursos existentes, se necessários
+      - name: Import cluster / nodegroup / secret if missing
         run: |
-          if terraform state list | grep -q '^aws_eks_cluster\.eks$'; then
-            echo "Cluster já presente no state – pulando import."
-          else
-            echo "Importando academy-cluster para o state..."
-            terraform import -no-color aws_eks_cluster.eks academy-cluster
-          fi
+          terraform state list | grep -q '^aws_eks_cluster\.eks$' || \
+            terraform import aws_eks_cluster.eks academy-cluster
+          terraform state list | grep -q '^aws_eks_node_group\.node_group$' || \
+            terraform import aws_eks_node_group.node_group academy-cluster:academy-node-group || true
+          terraform state list | grep -q '^aws_secretsmanager_secret\.eks_info$' || \
+            terraform import aws_secretsmanager_secret.eks_info $(aws secretsmanager list-secrets --region us-east-1 --query "SecretList[?Name=='eks-academy-cluster-info'].[ARN]" --output text) || true
 
-      #################################################################
-      # 6) Terraform Plan (salvo como artefato)
-      #################################################################
       - name: Terraform Plan
-        id: plan
         run: terraform plan -input=false -out=tfplan
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tfplan
-          path: tfplan
 
-      #################################################################
-      # 7) Terraform Apply
-      #################################################################
       - name: Terraform Apply
         run: terraform apply -input=false -auto-approve tfplan
 
-      #################################################################
-      # 8) (Opcional) Gera kubeconfig para passos posteriores
-      #################################################################
       - name: Generate kubeconfig
         run: aws eks update-kubeconfig --name academy-cluster --region us-east-1
