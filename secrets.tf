@@ -59,7 +59,7 @@ resource "aws_secretsmanager_secret" "eks_info" {
   description = "EKS connection data (endpoint, CA, kubeconfig)"
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
     ignore_changes  = [name]
   }
 }
