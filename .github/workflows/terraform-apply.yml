@@ -43,10 +43,10 @@ jobs:
         run: terraform apply -input=false -auto-approve tfplan
         continue-on-error: true     # permite passo seguinte se falhar
 
-      # Rollback: destrói tudo se o apply falhar
-      - name: Terraform Destroy (rollback)
-        if: steps.apply.outcome == 'failure'
-        run: terraform destroy -auto-approve
+      # # Rollback: destrói tudo se o apply falhar
+      # - name: Terraform Destroy (rollback)
+      #   if: steps.apply.outcome == 'failure'
+      #   run: terraform destroy -auto-approve
 
       # (opcional) kubeconfig para próximos passos
       - name: Generate kubeconfig
