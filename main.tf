@@ -101,10 +101,10 @@ resource "aws_eks_node_group" "node_group" {
   node_role_arn   = data.aws_iam_role.eks_node_role.arn
   subnet_ids      = values(aws_subnet.public)[*].id
 
-  instance_types = ["t3.micro"]
+  instance_types = ["t3.medium"]
 
   scaling_config {
-    desired_size = 2
+    desired_size = 3
     max_size     = 3
     min_size     = 1
   }
