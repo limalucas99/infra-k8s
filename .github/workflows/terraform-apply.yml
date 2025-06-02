@@ -41,7 +41,7 @@ jobs:
         run: terraform apply -input=false -auto-approve tfplan
         continue-on-error: true  
 
-      # Rollback: destrói tudo se o apply falhar
+      # Rollback: destrói tudo se o apply falhar!
       - name: Terraform Destroy (rollback)
         if: steps.apply.outcome == 'failure'
         run: terraform destroy -auto-approve
