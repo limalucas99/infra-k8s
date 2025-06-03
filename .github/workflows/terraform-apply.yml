@@ -1,13 +1,12 @@
 name: Terraform Apply (Kubernetes Infra)
 
 on:
-  push:
+  pull_request:
     branches: [ main ]
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
       - uses: actions/checkout@v4
@@ -40,14 +39,10 @@ jobs:
       - name: Terraform Apply
         id: apply
         run: terraform apply -input=false -auto-approve tfplan
-        continue-on-error: true     # permite passo seguinte se falhar
+        continue-on-error: true  
 
-      # Rollback: destrói tudo se o apply falhar
+      # Rollback: destrói tudo se o apply falhar!!
       - name: Terraform Destroy (rollback)
         if: steps.apply.outcome == 'failure'
         run: terraform destroy -auto-approve
 
-      # (opcional) kubeconfig para próximos passos
-      - name: Generate kubeconfig
-        if: steps.apply.outcome == 'success'
-        run: aws eks update-kubeconfig --name academy-cluster --region us-east-1
